@@ -189,17 +189,18 @@
         ]
       },
       "locked": {
-        "lastModified": 1783251082,
-        "narHash": "sha256-XfHlECWS/u6FWjYAMOsGk6pcGx+z3HA8WWGWR7VvTSI=",
-        "ref": "refs/heads/trunk",
-        "rev": "a45718d96cdde0101ef8c20942fada0b188745f0",
-        "revCount": 1,
-        "type": "git",
-        "url": "https://codeberg.org/caniko/nix-opencode-lsp.git"
+        "lastModified": 1785298780,
+        "narHash": "sha256-hq+/QcdG+pOKugcglqt92n3AwDbZnJB/Z+FCgmM3nwg=",
+        "owner": "caniko",
+        "repo": "nix-opencode-lsp",
+        "rev": "38e7ce16c754947a257a00a77682adfe696b6718",
+        "type": "github"
       },
       "original": {
-        "type": "git",
-        "url": "https://codeberg.org/caniko/nix-opencode-lsp.git"
+        "owner": "caniko",
+        "repo": "nix-opencode-lsp",
+        "rev": "38e7ce16c754947a257a00a77682adfe696b6718",
+        "type": "github"
       }
     },
     "nixpkgs": {
@@ -316,19 +317,18 @@
         "rust-overlay": "rust-overlay_2"
       },
       "locked": {
-        "lastModified": 1785398296,
-        "narHash": "sha256-/4BATEhiyv8tudat5JvipI8FP3LWu4F7z+bRggZQmzY=",
-        "ref": "trunk",
-        "rev": "c26b735eede8078f795651c4a9cbf0be8733b221",
-        "revCount": 159,
-        "type": "git",
-        "url": "https://codeberg.org/caniko/rs-harbor.git"
+        "lastModified": 1785620886,
+        "narHash": "sha256-uNFt+8v9YY8VjFiR5Xnhf5s4eJ2ShZXuxcpvcDSVFzE=",
+        "owner": "caniko",
+        "repo": "rs-harbor",
+        "rev": "e2778ff3beca1bd4c1f5183313251d1fb5b46dd6",
+        "type": "github"
       },
       "original": {
-        "ref": "trunk",
-        "rev": "c26b735eede8078f795651c4a9cbf0be8733b221",
-        "type": "git",
-        "url": "https://codeberg.org/caniko/rs-harbor.git"
+        "owner": "caniko",
+        "repo": "rs-harbor",
+        "rev": "e2778ff3beca1bd4c1f5183313251d1fb5b46dd6",
+        "type": "github"
       }
     },
     "rust-overlay": {
