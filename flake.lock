@@ -144,18 +144,18 @@
         ]
       },
       "locked": {
-        "lastModified": 1783765805,
-        "narHash": "sha256-PbZEexzZDxyOXp2v57iBV6D5DGCCkLyEdhjS0bN5Un8=",
+        "lastModified": 1787224113,
+        "narHash": "sha256-7Xz0gzc0Gg1DKamnT/eoytl6xUyGIfY1nZUTjQcaXjA=",
         "ref": "trunk",
-        "rev": "f3384cf15bc50fdb01c4fce1552e8c9fbad1199d",
-        "revCount": 4,
+        "rev": "519bc9305b5ba78f37c3226a9d8427c8f635afb8",
+        "revCount": 7,
         "type": "git",
-        "url": "ssh://git@codeberg.org/caniko/meta-harbor.git"
+        "url": "https://github.com/caniko/meta-harbor.git"
       },
       "original": {
         "ref": "trunk",
         "type": "git",
-        "url": "ssh://git@codeberg.org/caniko/meta-harbor.git"
+        "url": "https://github.com/caniko/meta-harbor.git"
       }
     },
     "nix-bundle": {
@@ -193,12 +193,12 @@
         "narHash": "sha256-hq+/QcdG+pOKugcglqt92n3AwDbZnJB/Z+FCgmM3nwg=",
         "rev": "38e7ce16c754947a257a00a77682adfe696b6718",
         "type": "git",
-        "url": "ssh://git@github.com/caniko/nix-opencode-lsp.git"
+        "url": "https://github.com/caniko/nix-opencode-lsp.git"
       },
       "original": {
         "ref": "trunk",
         "type": "git",
-        "url": "ssh://git@github.com/caniko/nix-opencode-lsp.git"
+        "url": "https://github.com/caniko/nix-opencode-lsp.git"
       }
     },
     "nixpkgs": {
@@ -330,19 +330,19 @@
         "rust-overlay": "rust-overlay_2"
       },
       "locked": {
-        "lastModified": 1786573790,
-        "narHash": "sha256-HNroLml6L6xV7ZS5pS8QYQdxfPqayi6kJYrClxNa3Gs=",
+        "lastModified": 1787224172,
+        "narHash": "sha256-u7SPaDpuam6neGpKtnWMv2tE4zTZmtUiY+UVvDvf41k=",
         "ref": "trunk",
-        "rev": "f209ddbca3fdbb0dc31fa3886ccc2ff7369c18ac",
-        "revCount": 164,
+        "rev": "05cc4f162b55fa904b687db1821e2463fa813e50",
+        "revCount": 185,
         "type": "git",
-        "url": "ssh://git@codeberg.org/caniko/rs-harbor.git"
+        "url": "ssh://git@github.com/caniko/rs-harbor.git"
       },
       "original": {
         "ref": "trunk",
-        "rev": "f209ddbca3fdbb0dc31fa3886ccc2ff7369c18ac",
+        "rev": "05cc4f162b55fa904b687db1821e2463fa813e50",
         "type": "git",
-        "url": "ssh://git@codeberg.org/caniko/rs-harbor.git"
+        "url": "ssh://git@github.com/caniko/rs-harbor.git"
       }
     },
     "rust-overlay": {
