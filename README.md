@@ -2,7 +2,7 @@
 
 <!-- simit:badges:start -->
 
-[![CI](https://img.shields.io/badge/CI-drift-2088ff)](.forgejo/workflows/ci.yaml) [![Nix](https://img.shields.io/badge/Nix-managed-5277c3)](flake.nix) [![crates.io](https://img.shields.io/badge/crates.io-ready-f46623)](https://crates.io/crates/ronix)
+[![CI](https://img.shields.io/badge/CI-managed-2088ff)](.github/workflows/ci.yaml) [![Nix](https://img.shields.io/badge/Nix-managed-5277c3)](flake.nix) [![crates.io](https://img.shields.io/badge/crates.io-ready-f46623)](https://crates.io/crates/ronix)
 
 <!-- simit:badges:end -->
 
@@ -96,7 +96,7 @@ ronix provides a pure-Nix library for converting between Nix values and RON. Add
 
 ```nix
 {
-  inputs.ronix.url = "codeberg:caniko/ronix";
+  inputs.ronix.url = "github:caniko/ronix";
 
   outputs = { ronix, ... }: {
     # Nix → RON
@@ -169,7 +169,7 @@ nix develop  # enter a dev shell with cargo, clippy, rustfmt
 
 ## CI
 
-Woodpecker CI on Codeberg runs `nix flake check` (tests, clippy, and fmt) on every push and pull request.
+GitHub Actions runs `nix flake check` (tests, clippy, and fmt) on every push and pull request.
 
 ## License
 

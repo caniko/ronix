@@ -10,11 +10,11 @@ href = "#overview"
 
 [[nav]]
 label = "Source"
-href = "ssh://git@codeberg.org/caniko/ronix.git"
+href = "https://github.com/caniko/ronix"
 
 [[footer_links]]
 label = "Source"
-href = "ssh://git@codeberg.org/caniko/ronix.git"
+href = "https://github.com/caniko/ronix"
 
 [[pages]]
 slug = "index"
@@ -29,7 +29,7 @@ subtitle = "Serialize Rust values to Nix expressions, parse RON, and convert in 
 
 [[pages.sections.ctas]]
 label = "View source"
-href = "ssh://git@codeberg.org/caniko/ronix.git"
+href = "https://github.com/caniko/ronix"
 primary = true
 
 [[pages.sections]]

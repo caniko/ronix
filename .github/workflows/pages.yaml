@@ -8,7 +8,7 @@ on:
   workflow_dispatch:
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
+  group: ${{ github.workflow_ref }}-${{ github.ref }}
   cancel-in-progress: true
 
 permissions:
@@ -18,10 +18,7 @@ permissions:
 
 jobs:
   publish:
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     env:
       NIX_CONFIG: "experimental-features = nix-command flakes"
     steps:
@@ -31,11 +28,9 @@ jobs:
       - name: Install Nix
         uses: cachix/install-nix-action@630ae543ea3a38a9a4166f03376c02c50f408342 # v31
 
-      - name: Configure GitHub Pages
-        uses: actions/configure-pages@45bfe0192ca1faeb007ade9deae92b16b8254a0d # v6
       - name: Build Pages site
         run: |
-          nix build .#site --out-link result-pages-site
+          nix build .#site --no-link --out-link result-pages-site
           test -f result-pages-site/.domains
           grep -qx ronix.tartanoglu.com result-pages-site/.domains
       - name: Upload Pages artifact

@@ -2,7 +2,8 @@
   description = "ronix — RON ↔ Nix interop: serde serializer for Nix expressions + toRON/fromRON Nix library";
 
   inputs = {
-    rs-harbor.url = "git+ssh://git@github.com/caniko/rs-harbor.git?ref=trunk&rev=05cc4f162b55fa904b687db1821e2463fa813e50";
+    harbor-rs.url = "git+ssh://git@github.com/caniko/harbor-rs.git?ref=trunk&rev=05cc4f162b55fa904b687db1821e2463fa813e50";
+    rs-harbor.follows = "harbor-rs";
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
     crane.url = "github:ipetkov/crane";
     plinth = {
@@ -14,7 +15,7 @@
   outputs =
     {
       self,
-      rs-harbor,
+      harbor-rs,
       nixpkgs,
       crane,
       plinth,
@@ -28,9 +29,9 @@
       forSystems = nixpkgs.lib.genAttrs supportedSystems;
       pkgsFor = system: import nixpkgs {
         inherit system;
-        overlays = [(import rs-harbor.inputs.rust-overlay)];
+        overlays = [(import harbor-rs.inputs.rust-overlay)];
       };
-      toolchainFor = system: rs-harbor.lib.mkToolchain { pkgs = pkgsFor system; toolchainProfile = "stable"; };
+      toolchainFor = system: harbor-rs.lib.mkToolchain { pkgs = pkgsFor system; toolchainProfile = "stable"; };
       craneLibFor = system: (toolchainFor system).craneLib;
 
       packageFor =
@@ -38,9 +39,9 @@
         let
           craneLib = craneLibFor system;
           pkgs = pkgsFor system;
-          buildCache = rs-harbor.lib.mkBuildCachePolicy {
+          buildCache = harbor-rs.lib.mkBuildCachePolicy {
             inherit pkgs;
-            sccachePackage = rs-harbor.packages.${system}.sccache;
+            sccachePackage = harbor-rs.packages.${system}.sccache;
             cacheRoot = null;
             namespaceScope = "canix-rust";
             namespaceGeneration = 5;

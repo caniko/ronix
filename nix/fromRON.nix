@@ -208,5 +208,5 @@ let
         value = trimmed;
       };
 in
-lib.warn "ronix.fromRON: This function is experimental. Please report issues at https://codeberg.org/caniko/ronix"
+lib.warn "ronix.fromRON: This function is experimental. Please report issues at https://github.com/caniko/ronix"
   fromRON'
