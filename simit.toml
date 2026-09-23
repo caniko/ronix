@@ -4,6 +4,7 @@ runtime = "nix"
 provider = "actions"
 platform = "github"
 publish_crates = true
+all_features = false
 
 [ci.pages]
 repo = "caniko/ronix"
