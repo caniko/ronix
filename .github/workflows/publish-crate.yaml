@@ -11,8 +11,8 @@ on:
   workflow_dispatch:
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.event.pull_request.head.ref || github.ref }}
-  cancel-in-progress: true
+  group: ${{ github.workflow_ref }}-${{ github.ref }}
+  cancel-in-progress: false
 
 jobs:
   publish:
@@ -30,6 +30,7 @@ jobs:
 
       - name: Install Nix
         uses: cachix/install-nix-action@630ae543ea3a38a9a4166f03376c02c50f408342 # v31
+
       - name: Add cargo bin to PATH
         run: echo "$CARGO_HOME/bin" >> "$GITHUB_PATH"
 
@@ -82,8 +83,14 @@ jobs:
       - name: Test
         run: nix develop -c cargo test
 
+      - name: Test no default features
+        run: nix develop -c cargo test --no-default-features
+
       - name: Clippy
         run: nix develop -c cargo clippy --all-targets -- --deny warnings
+
+      - name: Clippy no default features
+        run: nix develop -c cargo clippy --all-targets --no-default-features -- --deny warnings
 
       - name: Dry-run publish
         run: nix develop -c cargo publish --dry-run
