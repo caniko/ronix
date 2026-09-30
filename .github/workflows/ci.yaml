@@ -11,7 +11,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.event.pull_request.head.ref || github.ref }}
+  group: ${{ github.workflow_ref }}-${{ github.event_name }}-${{ github.head_ref || github.ref_name }}
   cancel-in-progress: true
 
 jobs:
@@ -27,8 +27,20 @@ jobs:
 
       - name: Install Nix
         uses: cachix/install-nix-action@630ae543ea3a38a9a4166f03376c02c50f408342 # v31
+
+      - name: Configure GitHub input transport
+        run: |
+          git config --global --add url.https://github.com/.insteadOf ssh://git@github.com/
+          git config --global --add url.https://github.com/.insteadOf git@github.com:
+
       - name: Add cargo bin to PATH
         run: echo "$CARGO_HOME/bin" >> "$GITHUB_PATH"
+
+      - name: Format check
+        run: |
+          # Expand formatter variables inside the Nix shell.
+          # shellcheck disable=SC2016
+          nix develop -c sh -c 'formatter=$(nix eval --impure --raw --expr "let root = toString ./.; flake = builtins.getFlake (if builtins.pathExists ./.git then \"git+file://\" + root else root); in if flake ? formatter.\${builtins.currentSystem} then flake.formatter.\${builtins.currentSystem}.drvPath else \"\"") || exit; if [ -n "$formatter" ]; then formatter_path=$(nix build --no-link --print-out-paths "$formatter^out") || exit; if [ -x "$formatter_path/bin/treefmt" ]; then exec "$formatter_path/bin/treefmt" --ci; fi; fi; if command -v treefmt >/dev/null 2>&1; then exec treefmt --ci; else exec cargo fmt --all -- --check; fi'
 
       - name: Check flake
         run: nix flake check
@@ -36,8 +48,14 @@ jobs:
       - name: Test
         run: nix develop -c cargo test
 
+      - name: Test no default features
+        run: nix develop -c cargo test --no-default-features
+
       - name: Clippy
         run: nix develop -c cargo clippy --all-targets -- --deny warnings
+
+      - name: Clippy no default features
+        run: nix develop -c cargo clippy --all-targets --no-default-features -- --deny warnings
 
       - name: Package crate
         run: nix develop -c cargo package --allow-dirty --list
