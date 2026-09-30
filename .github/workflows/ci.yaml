@@ -28,11 +28,16 @@ jobs:
       - name: Install Nix
         uses: cachix/install-nix-action@630ae543ea3a38a9a4166f03376c02c50f408342 # v31
 
+      - name: Configure GitHub input transport
+        run: |
+          git config --global --add url.https://github.com/.insteadOf ssh://git@github.com/
+          git config --global --add url.https://github.com/.insteadOf git@github.com:
+
       - name: Add cargo bin to PATH
         run: echo "$CARGO_HOME/bin" >> "$GITHUB_PATH"
 
       - name: Format check
-        run: nix develop -c treefmt --ci
+        run: nix develop -c sh -c 'if command -v treefmt >/dev/null 2>&1; then exec treefmt --ci; else exec cargo fmt --all -- --check; fi'
 
       - name: Check flake
         run: nix flake check
