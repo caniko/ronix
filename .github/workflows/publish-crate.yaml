@@ -4,15 +4,15 @@
 # - keys/maintainers.gpg: pinned maintainer OpenPGP public keys for git verify-tag.
 name: Publish Crate
 
+# GitHub crates.io publishers run only on signed semver tag pushes. Retry the original run rather than dispatching a branch.
 on:
   push:
     tags:
       - "[0-9]*"
-  workflow_dispatch:
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.event.pull_request.head.ref || github.ref }}
-  cancel-in-progress: true
+  group: ${{ github.workflow_ref }}-${{ github.ref }}
+  cancel-in-progress: false
 
 jobs:
   publish:
@@ -27,13 +27,24 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
 
       - name: Install Nix
         uses: cachix/install-nix-action@630ae543ea3a38a9a4166f03376c02c50f408342 # v31
+
+      - name: Configure GitHub input transport
+        run: |
+          git config --global --add url.https://github.com/.insteadOf ssh://git@github.com/
+          git config --global --add url.https://github.com/.insteadOf git@github.com:
+
       - name: Add cargo bin to PATH
         run: echo "$CARGO_HOME/bin" >> "$GITHUB_PATH"
 
       - name: Validate signed release tag
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
           tag="${GITHUB_REF_NAME:-${FORGE_REF_NAME:-${CODEBERG_REF_NAME:-}}}"
@@ -44,6 +55,42 @@ jobs:
 
           if ! printf '%s\n' "$tag" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+$'; then
             echo "Tag must be an exact semver version like 0.1.1, got '$tag'" >&2
+            exit 1
+          fi
+          if ! command -v gpg >/dev/null 2>&1; then
+            if command -v apt-get >/dev/null 2>&1; then
+              apt-get update
+              apt-get install -y --no-install-recommends gnupg
+            else
+              echo "gpg is required to verify signed release tags" >&2
+              exit 1
+            fi
+          fi
+          git_fetch() {
+            if [ -n "${GITHUB_TOKEN:-}" ]; then
+              auth_header="AUTHORIZATION: basic $(printf 'x-access-token:%s' "$GITHUB_TOKEN" | base64 | tr -d '\n')"
+              git -c "http.extraHeader=$auth_header" fetch "$@"
+            else
+              git fetch "$@"
+            fi
+          }
+          GNUPGHOME="$(mktemp -d)"
+          export GNUPGHOME
+          trap 'rm -rf "$GNUPGHOME"' EXIT
+          chmod 700 "$GNUPGHOME"
+          # The release checkout cannot supply its own verification key.
+          # Fetch the repository's independently maintained default-branch key.
+          git_fetch --no-tags origin HEAD
+          git show "FETCH_HEAD:keys/maintainers.gpg" > "$GNUPGHOME/maintainers.gpg"
+          test -s "$GNUPGHOME/maintainers.gpg"
+          gpg --batch --import "$GNUPGHOME/maintainers.gpg"
+
+          git_fetch --force --tags origin "refs/tags/${tag}:refs/tags/${tag}"
+          git verify-tag "$tag"
+          validated_sha="$(git rev-parse --verify "refs/tags/${tag}^{commit}")"
+          checkout_sha="$(git rev-parse --verify HEAD)"
+          if [ "$validated_sha" != "$checkout_sha" ]; then
+            echo "Signed tag commit does not match the checkout being published" >&2
             exit 1
           fi
 
@@ -58,32 +105,20 @@ jobs:
             exit 1
           fi
 
-          test -s keys/maintainers.gpg
-          if ! command -v gpg >/dev/null 2>&1; then
-            if command -v apt-get >/dev/null 2>&1; then
-              apt-get update
-              apt-get install -y --no-install-recommends gnupg
-            else
-              echo "gpg is required to verify signed release tags" >&2
-              exit 1
-            fi
-          fi
-          GNUPGHOME="$(mktemp -d)"
-          export GNUPGHOME
-          trap 'rm -rf "$GNUPGHOME"' EXIT
-          chmod 700 "$GNUPGHOME"
-          gpg --batch --import keys/maintainers.gpg
-          git fetch --force --tags origin "refs/tags/${tag}:refs/tags/${tag}"
-          git verify-tag "$tag"
-
       - name: Check flake
         run: nix flake check
 
       - name: Test
         run: nix develop -c cargo test
 
+      - name: Test no default features
+        run: nix develop -c cargo test --no-default-features
+
       - name: Clippy
         run: nix develop -c cargo clippy --all-targets -- --deny warnings
+
+      - name: Clippy no default features
+        run: nix develop -c cargo clippy --all-targets --no-default-features -- --deny warnings
 
       - name: Dry-run publish
         run: nix develop -c cargo publish --dry-run
@@ -103,24 +138,40 @@ jobs:
             echo "Could not determine release version from tag ref" >&2
             exit 1
           fi
-          if ! command -v curl >/dev/null 2>&1; then
+          if ! command -v curl >/dev/null 2>&1 || ! command -v jq >/dev/null 2>&1; then
             if command -v apt-get >/dev/null 2>&1; then
-              apt-get update
-              apt-get install -y --no-install-recommends curl ca-certificates
+              if [ "$(id -u)" = 0 ]; then apt=(apt-get); else apt=(sudo apt-get); fi
+              "${apt[@]}" update
+              "${apt[@]}" install -y --no-install-recommends curl ca-certificates jq
             else
-              echo "curl is required to check crates.io for existing versions" >&2
+              echo "curl and jq are required to check crates.io for existing versions" >&2
               exit 1
             fi
           fi
-          if ! status="$(curl --retry 3 -sS -o /dev/null -w '%{http_code}' -A 'simit init ci publish check' "https://crates.io/api/v1/crates/${crate_name}/${version}")"; then
+          # Only discover the target directory; the package-scoped signed-tag
+          # version extractor remains separate. Never update the verified lock.
+          target_dir="$(nix develop -c cargo metadata --locked --no-deps --format-version 1 | jq -er '.target_directory')"
+          local_crate="${target_dir}/package/${crate_name}-${version}.crate"
+          test -f "$local_crate" || { echo "missing verified package archive: $local_crate" >&2; exit 1; }
+          local_checksum="$(sha256sum "$local_crate" | awk '{print $1}')"
+          response="$(mktemp)"
+          trap 'rm -f "$response"' EXIT
+          if ! status="$(curl --connect-timeout 10 --max-time 60 --retry 3 -sS -o "$response" -w '%{http_code}' -A 'simit publish preflight' "https://crates.io/api/v1/crates/${crate_name}/${version}")"; then
             status=000
           fi
           case "$status" in
             200)
-              echo "${crate_name} ${version} is already published on crates.io; skipping publish"
-              exit 0
+              echo "${crate_name} ${version} already exists on crates.io; verifying it is the intended release"
+              published_checksum="$(jq -er --arg name "$crate_name" --arg v "$version" '.version | select(.crate == $name and .num == $v and .yanked == false) | .checksum | select(type == "string" and test("^[0-9a-f]{64}$"))' "$response")" || { echo "invalid, mismatched or yanked registry version; refusing to treat as success" >&2; exit 1; }
+              if [ "$local_checksum" = "$published_checksum" ]; then echo "checksum matches; resuming (already published)"; exit 0; fi
+              echo "conflict: ${crate_name} ${version} exists but checksum does not match the local archive; refusing to treat as success" >&2
+              exit 1
               ;;
             404)
+              ;;
+            401|403)
+              echo "authorization/ownership failure checking ${crate_name} ${version} (HTTP $status)" >&2
+              exit 1
               ;;
             *)
               echo "Could not check crates.io for ${crate_name} ${version} before publishing (HTTP $status)" >&2
@@ -133,3 +184,39 @@ jobs:
           fi
           export CARGO_REGISTRY_TOKEN="${CARGO_REGISTRY_TOKEN:-$CRATES_IO_API_TOKEN}"
           nix develop -c cargo publish
+
+      - name: Wait for exact registry resolution
+        run: |
+          set -euo pipefail
+          crate_name='ronix'
+          version="${GITHUB_REF_NAME:-${FORGE_REF_NAME:-${CODEBERG_REF_NAME:-}}}"
+          if [ -z "$version" ]; then
+            ref="${GITHUB_REF:-${FORGE_REF:-${CODEBERG_REF:-}}}"
+            version="${ref#refs/tags/}"
+          fi
+          target_dir="$(nix develop -c cargo metadata --locked --no-deps --format-version 1 | jq -er '.target_directory')"
+          local_checksum="$(sha256sum "$target_dir/package/${crate_name}-${version}.crate" | awk '{print $1}')"
+          probe="$(mktemp -d)"
+          trap 'rm -rf "$probe"' EXIT
+          mkdir "$probe/src"
+          touch "$probe/src/lib.rs"
+          printf '[package]\nname = "simit-registry-probe"\nversion = "0.0.0"\nedition = "2021"\n[workspace]\n[dependencies]\n%s = { version = "=%s", registry = "crates-io", default-features = false }\n' "$crate_name" "$version" > "$probe/Cargo.toml"
+          # A web response is not index readiness. Resolve and fetch an exact
+          # registry dependency in an isolated workspace, retaining binary-only
+          # crates and checking the lock source/version/checksum against our archive.
+          for attempt in $(seq 1 20); do
+            rm -f "$probe/Cargo.lock"
+            if timeout --kill-after=5s 60s nix develop -c cargo fetch --manifest-path "$probe/Cargo.toml" > "$probe/fetch.log" 2> "$probe/error.log" && awk -v wanted_name="$crate_name" -v wanted_version="$version" -v wanted_checksum="$local_checksum" '
+              function matches() { return name == wanted_name && version == wanted_version && source == "registry+https://github.com/rust-lang/crates.io-index" && checksum == wanted_checksum }
+              /^\[\[package\]\]/ { if (matches()) found = 1; name = version = source = checksum = "" }
+              /^(name|version|source|checksum) = "/ { value = $3; gsub(/"/, "", value); if ($1 == "name") name = value; else if ($1 == "version") version = value; else if ($1 == "source") source = value; else checksum = value }
+              END { exit !(found || matches()) }
+            ' "$probe/Cargo.lock"; then
+              echo "resolved and fetched ${crate_name} ${version} from crates.io (attempt $attempt)"
+              break
+            fi
+            cat "$probe/error.log" >&2
+            if [ "$attempt" = 20 ]; then echo "registry resolution timeout for ${crate_name} ${version}" >&2; exit 1; fi
+            echo "waiting for exact registry resolution of ${crate_name} ${version} (attempt $attempt/20)"
+            sleep 30
+          done

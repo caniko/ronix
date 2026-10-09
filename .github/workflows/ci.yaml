@@ -11,7 +11,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.event.pull_request.head.ref || github.ref }}
+  group: ${{ github.workflow_ref }}-${{ github.event_name }}-${{ github.head_ref || github.ref_name }}
   cancel-in-progress: true
 
 jobs:
@@ -27,8 +27,20 @@ jobs:
 
       - name: Install Nix
         uses: cachix/install-nix-action@630ae543ea3a38a9a4166f03376c02c50f408342 # v31
+
+      - name: Configure GitHub input transport
+        run: |
+          git config --global --add url.https://github.com/.insteadOf ssh://git@github.com/
+          git config --global --add url.https://github.com/.insteadOf git@github.com:
+
       - name: Add cargo bin to PATH
         run: echo "$CARGO_HOME/bin" >> "$GITHUB_PATH"
+
+      - name: Format check
+        run: |
+          # Expand formatter variables inside the Nix shell.
+          # shellcheck disable=SC2016
+          nix develop -c sh -c 'formatter_expr="let root = toString ./.; flake = builtins.getFlake (if builtins.pathExists ./.git then \"git+file://\" + root else root); in if flake ? formatter.\${builtins.currentSystem} then flake.formatter.\${builtins.currentSystem} else null"; formatter=$(nix eval --impure --raw --expr "let f = ($formatter_expr); in if f == null then \"\" else f.drvPath") || exit; if [ -n "$formatter" ]; then formatter_program=$(nix eval --impure --raw --expr "let f = ($formatter_expr); in f.meta.mainProgram or (f.pname or (builtins.parseDrvName f.name).name)") || exit; formatter_path=$(nix build --no-link --print-out-paths "$formatter^out") || exit; formatter_exe="$formatter_path/bin/$formatter_program"; if [ ! -x "$formatter_exe" ]; then echo "Declared flake formatter executable is missing: $formatter_exe" >&2; exit 1; fi; if [ "$formatter_program" = treefmt ]; then exec "$formatter_exe" --ci; fi; repository_root=$(git rev-parse --show-toplevel) || exit; index_tree=$(git -C "$repository_root" write-tree) || exit; snapshot_dir=$(mktemp -d "${TMPDIR:-/tmp}/simit-format.XXXXXXXX") || exit; trap "rm -rf -- \"\$snapshot_dir\"" 0; trap "exit 129" HUP; trap "exit 130" INT; trap "exit 143" TERM; snapshot_dir=$(cd "$snapshot_dir" && pwd -P) || exit; case "$snapshot_dir/" in "$repository_root/"*) echo "Formatter snapshot directory must be outside the repository" >&2; exit 1;; esac; snapshot_worktree() { GIT_INDEX_FILE="$snapshot_dir/index" git -C "$repository_root" read-tree "$index_tree" && GIT_INDEX_FILE="$snapshot_dir/index" git -C "$repository_root" add --all -- . && GIT_INDEX_FILE="$snapshot_dir/index" git -C "$repository_root" write-tree; }; before_tree=$(snapshot_worktree) || exit; "$formatter_exe" || exit; after_tree=$(snapshot_worktree) || exit; current_index=$(git -C "$repository_root" write-tree) || exit; if [ "$before_tree" != "$after_tree" ] || [ "$index_tree" != "$current_index" ]; then echo "Formatter modified repository content or staging" >&2; exit 1; fi; exit 0; fi; if command -v treefmt >/dev/null 2>&1; then exec treefmt --ci; else exec cargo fmt --all -- --check; fi'
 
       - name: Check flake
         run: nix flake check
@@ -36,8 +48,14 @@ jobs:
       - name: Test
         run: nix develop -c cargo test
 
+      - name: Test no default features
+        run: nix develop -c cargo test --no-default-features
+
       - name: Clippy
         run: nix develop -c cargo clippy --all-targets -- --deny warnings
+
+      - name: Clippy no default features
+        run: nix develop -c cargo clippy --all-targets --no-default-features -- --deny warnings
 
       - name: Package crate
         run: nix develop -c cargo package --allow-dirty --list
