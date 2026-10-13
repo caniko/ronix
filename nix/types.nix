@@ -5,15 +5,14 @@
 let
   inherit (builtins) attrNames isAttrs;
   inherit (import ./internal.nix) mkAssertion mkThrow;
-in
-{
-  isRONType =
-    v:
+in {
+  isRONType = v:
     v ? __type
     && (
       (
         (
-          v.__type == "char"
+          v.__type
+          == "char"
           || v.__type == "map"
           || v.__type == "optional"
           || v.__type == "raw"
@@ -25,8 +24,7 @@ in
       || (v.__type == "enum" && (v ? variant || (v ? variant && v ? value)))
     );
 
-  mkRON =
-    type: value:
+  mkRON = type: value:
     {
       char = {
         __type = "char";
@@ -34,41 +32,39 @@ in
       };
 
       enum =
-        if isAttrs value then
+        if isAttrs value
+        then
           assert mkAssertion "mkRON" (
-            attrNames value == [
+            attrNames value
+            == [
               "value"
               "variant"
             ]
-          ) "enum type must receive a string or an attribute set with value and variant keys";
-          {
+          ) "enum type must receive a string or an attribute set with value and variant keys"; {
             __type = "enum";
             inherit (value) value variant;
           }
-        else
-          {
-            __type = "enum";
-            variant = value;
-          };
+        else {
+          __type = "enum";
+          variant = value;
+        };
 
       map = {
         __type = "map";
         inherit value;
       };
 
-      namedStruct =
-        assert mkAssertion "mkRON" (
-          isAttrs value
-          &&
-            attrNames value == [
-              "name"
-              "value"
-            ]
-        ) "namedStruct type must receive an attribute set with name and value keys.";
-        {
-          __type = "namedStruct";
-          inherit (value) name value;
-        };
+      namedStruct = assert mkAssertion "mkRON" (
+        isAttrs value
+        && attrNames value
+        == [
+          "name"
+          "value"
+        ]
+      ) "namedStruct type must receive an attribute set with name and value keys."; {
+        __type = "namedStruct";
+        inherit (value) name value;
+      };
 
       optional = {
         __type = "optional";
@@ -85,5 +81,7 @@ in
         inherit value;
       };
     }
-    .${type} or (mkThrow "mkRON" "${type} is not supported.");
+    .${
+      type
+    } or (mkThrow "mkRON" "${type} is not supported.");
 }

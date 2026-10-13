@@ -2,7 +2,7 @@
 # Before creating and pushing a release tag, run `simit changelog release <version>` locally.
 # Required release trust roots and secrets:
 # - keys/maintainers.gpg: pinned maintainer OpenPGP public keys for git verify-tag.
-name: Publish Crate
+name: "Build Crate ronix"
 
 # GitHub crates.io publishers run only on signed semver tag pushes. Retry the original run rather than dispatching a branch.
 on:
@@ -18,7 +18,6 @@ jobs:
   publish:
     permissions:
       contents: read
-      id-token: write
     runs-on: ubuntu-24.04
     env:
       NIX_CONFIG: "experimental-features = nix-command flakes"
@@ -26,13 +25,13 @@ jobs:
       CARGO_HOME: "/tmp/.cargo"
     steps:
       - name: Checkout
-        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ github.sha }}
           persist-credentials: false
 
       - name: Install Nix
-        uses: cachix/install-nix-action@630ae543ea3a38a9a4166f03376c02c50f408342 # v31
+        uses: cachix/install-nix-action@13d8dd58da0234aa297dedd986986ccb8e7f3e24 # v31.11.1
 
       - name: Configure GitHub input transport
         run: |
@@ -57,6 +56,7 @@ jobs:
             echo "Tag must be an exact semver version like 0.1.1, got '$tag'" >&2
             exit 1
           fi
+
           if ! command -v gpg >/dev/null 2>&1; then
             if command -v apt-get >/dev/null 2>&1; then
               apt-get update
@@ -123,100 +123,18 @@ jobs:
       - name: Dry-run publish
         run: nix develop -c cargo publish --dry-run
 
-      - name: Publish
-        env:
-          CRATES_IO_API_TOKEN: ${{ secrets.CRATES_IO_API_TOKEN }}
+      - name: Build immutable archive ronix
         run: |
           set -euo pipefail
-          crate_name='ronix'
-          version="${GITHUB_REF_NAME:-${FORGE_REF_NAME:-${CODEBERG_REF_NAME:-}}}"
-          if [ -z "$version" ]; then
-            ref="${GITHUB_REF:-${FORGE_REF:-${CODEBERG_REF:-}}}"
-            version="${ref#refs/tags/}"
-          fi
-          if [ -z "$version" ]; then
-            echo "Could not determine release version from tag ref" >&2
-            exit 1
-          fi
-          if ! command -v curl >/dev/null 2>&1 || ! command -v jq >/dev/null 2>&1; then
-            if command -v apt-get >/dev/null 2>&1; then
-              if [ "$(id -u)" = 0 ]; then apt=(apt-get); else apt=(sudo apt-get); fi
-              "${apt[@]}" update
-              "${apt[@]}" install -y --no-install-recommends curl ca-certificates jq
-            else
-              echo "curl and jq are required to check crates.io for existing versions" >&2
-              exit 1
-            fi
-          fi
-          # Only discover the target directory; the package-scoped signed-tag
-          # version extractor remains separate. Never update the verified lock.
-          target_dir="$(nix develop -c cargo metadata --locked --no-deps --format-version 1 | jq -er '.target_directory')"
-          local_crate="${target_dir}/package/${crate_name}-${version}.crate"
-          test -f "$local_crate" || { echo "missing verified package archive: $local_crate" >&2; exit 1; }
-          local_checksum="$(sha256sum "$local_crate" | awk '{print $1}')"
-          response="$(mktemp)"
-          trap 'rm -f "$response"' EXIT
-          if ! status="$(curl --connect-timeout 10 --max-time 60 --retry 3 -sS -o "$response" -w '%{http_code}' -A 'simit publish preflight' "https://crates.io/api/v1/crates/${crate_name}/${version}")"; then
-            status=000
-          fi
-          case "$status" in
-            200)
-              echo "${crate_name} ${version} already exists on crates.io; verifying it is the intended release"
-              published_checksum="$(jq -er --arg name "$crate_name" --arg v "$version" '.version | select(.crate == $name and .num == $v and .yanked == false) | .checksum | select(type == "string" and test("^[0-9a-f]{64}$"))' "$response")" || { echo "invalid, mismatched or yanked registry version; refusing to treat as success" >&2; exit 1; }
-              if [ "$local_checksum" = "$published_checksum" ]; then echo "checksum matches; resuming (already published)"; exit 0; fi
-              echo "conflict: ${crate_name} ${version} exists but checksum does not match the local archive; refusing to treat as success" >&2
-              exit 1
-              ;;
-            404)
-              ;;
-            401|403)
-              echo "authorization/ownership failure checking ${crate_name} ${version} (HTTP $status)" >&2
-              exit 1
-              ;;
-            *)
-              echo "Could not check crates.io for ${crate_name} ${version} before publishing (HTTP $status)" >&2
-              exit 1
-              ;;
-          esac
-          if [ -z "${CRATES_IO_API_TOKEN:-}" ] && [ -z "${CARGO_REGISTRY_TOKEN:-}" ]; then
-            echo "CRATES_IO_API_TOKEN is required to publish to crates.io" >&2
-            exit 1
-          fi
-          export CARGO_REGISTRY_TOKEN="${CARGO_REGISTRY_TOKEN:-$CRATES_IO_API_TOKEN}"
-          nix develop -c cargo publish
-
-      - name: Wait for exact registry resolution
-        run: |
-          set -euo pipefail
-          crate_name='ronix'
-          version="${GITHUB_REF_NAME:-${FORGE_REF_NAME:-${CODEBERG_REF_NAME:-}}}"
-          if [ -z "$version" ]; then
-            ref="${GITHUB_REF:-${FORGE_REF:-${CODEBERG_REF:-}}}"
-            version="${ref#refs/tags/}"
-          fi
-          target_dir="$(nix develop -c cargo metadata --locked --no-deps --format-version 1 | jq -er '.target_directory')"
-          local_checksum="$(sha256sum "$target_dir/package/${crate_name}-${version}.crate" | awk '{print $1}')"
-          probe="$(mktemp -d)"
-          trap 'rm -rf "$probe"' EXIT
-          mkdir "$probe/src"
-          touch "$probe/src/lib.rs"
-          printf '[package]\nname = "simit-registry-probe"\nversion = "0.0.0"\nedition = "2021"\n[workspace]\n[dependencies]\n%s = { version = "=%s", registry = "crates-io", default-features = false }\n' "$crate_name" "$version" > "$probe/Cargo.toml"
-          # A web response is not index readiness. Resolve and fetch an exact
-          # registry dependency in an isolated workspace, retaining binary-only
-          # crates and checking the lock source/version/checksum against our archive.
-          for attempt in $(seq 1 20); do
-            rm -f "$probe/Cargo.lock"
-            if timeout --kill-after=5s 60s nix develop -c cargo fetch --manifest-path "$probe/Cargo.toml" > "$probe/fetch.log" 2> "$probe/error.log" && awk -v wanted_name="$crate_name" -v wanted_version="$version" -v wanted_checksum="$local_checksum" '
-              function matches() { return name == wanted_name && version == wanted_version && source == "registry+https://github.com/rust-lang/crates.io-index" && checksum == wanted_checksum }
-              /^\[\[package\]\]/ { if (matches()) found = 1; name = version = source = checksum = "" }
-              /^(name|version|source|checksum) = "/ { value = $3; gsub(/"/, "", value); if ($1 == "name") name = value; else if ($1 == "version") version = value; else if ($1 == "source") source = value; else checksum = value }
-              END { exit !(found || matches()) }
-            ' "$probe/Cargo.lock"; then
-              echo "resolved and fetched ${crate_name} ${version} from crates.io (attempt $attempt)"
-              break
-            fi
-            cat "$probe/error.log" >&2
-            if [ "$attempt" = 20 ]; then echo "registry resolution timeout for ${crate_name} ${version}" >&2; exit 1; fi
-            echo "waiting for exact registry resolution of ${crate_name} ${version} (attempt $attempt/20)"
-            sleep 30
-          done
+          version="${GITHUB_REF_NAME}"
+          test "$(nix develop -c cargo pkgid --locked -p ronix | awk -F'[#@]' 'NF > 1 {print $NF}' | tail -n 1)" = "$version"
+          nix develop -c cargo package --locked --allow-dirty --no-verify -p ronix --target-dir "$RUNNER_TEMP/simit-package-target"
+          mkdir -p "$RUNNER_TEMP/simit-crates/ronix"
+          cp "$RUNNER_TEMP/simit-package-target/package/ronix-$version.crate" "$RUNNER_TEMP/simit-crates/ronix/"
+      - name: Retain original-run archive ronix
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: simit-crate-ronix-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/simit-crates/ronix/*.crate
+          if-no-files-found: error
+          retention-days: 30
