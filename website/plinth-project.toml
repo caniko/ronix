@@ -1,16 +1,23 @@
 [site]
 title = "ronix"
-description = "A Rust library and Nix flake for bidirectional conversion between RON and Nix expressions."
+description = "A Rust library and Nix flake that serialize any Rust value into a Nix expression, wrap it as a NixOS module, or read RON config files from pure Nix."
 base_url = "/"
-footer_note = "Generated from repository metadata by the plinth-project FOSS sweep."
 
 [[nav]]
 label = "Overview"
 href = "#overview"
 
 [[nav]]
+label = "Quick start"
+href = "#quick-start"
+
+[[nav]]
 label = "Source"
 href = "https://github.com/caniko/ronix"
+
+[[footer_links]]
+label = "crates.io"
+href = "https://crates.io/crates/ronix"
 
 [[footer_links]]
 label = "Source"
@@ -19,27 +26,65 @@ href = "https://github.com/caniko/ronix"
 [[pages]]
 slug = "index"
 title = "ronix"
-description = "A Rust library and Nix flake for bidirectional conversion between RON and Nix expressions."
+description = "A Rust library and Nix flake that serialize any Rust value into a Nix expression, wrap it as a NixOS module, or read RON config files from pure Nix."
 
 [[pages.sections]]
 type = "hero"
 title = "ronix"
-tagline = "Bidirectional RON and Nix conversion"
-subtitle = "Serialize Rust values to Nix expressions, parse RON, and convert in both directions."
+tagline = "Rust config types and Nix expressions, converted both ways"
+subtitle = "A Rust library and Nix flake that turns any serializable value into a Nix expression, wraps it as a NixOS module, and reads RON configuration back from pure Nix."
 
 [[pages.sections.ctas]]
 label = "View source"
 href = "https://github.com/caniko/ronix"
 primary = true
 
+[[pages.sections.ctas]]
+label = "Quick start"
+href = "#quick-start"
+
 [[pages.sections]]
 type = "feature_grid"
 id = "overview"
 
 [[pages.sections.features]]
-title = "Rust"
-description = "Project technology detected from repository manifests."
+title = "Your Rust type is the schema"
+description = "With Serialize derived, ronix::to_nix walks the value into a Nix attribute set, so the Rust struct stays the one definition of the configuration shape instead of a hand-kept Nix copy. Nix interpolation inside strings is escaped, and escape_nix_string is public for the strings you build yourself."
 
 [[pages.sections.features]]
-title = "Nix"
-description = "Project technology detected from repository manifests."
+title = "Module wrapping built in"
+description = "to_nix_module places the same value under an attribute path and returns the _: { attr.path = ...; } wrapper that a NixOS module expects, and ron_to_nix_module does it for a RON string. No caller writes that wrapper by hand."
+
+[[pages.sections.features]]
+title = "RON to Nix, and back in pure Nix"
+description = "ron_to_nix parses a RON string into a Nix expression, so a Rust program, a RON file and a NixOS host can share one configuration. The flake's pure-Nix library goes the other way with toRON, fromRON, importRON and mkRON constructors for the RON types Nix does not model: optionals, enums, tuples, chars and maps."
+
+[[pages.sections.features]]
+title = "A service from RON settings"
+description = "mkRonService takes a settings set and an exec line, writes /etc/<name>/config.ron and returns the matching systemd service. The optional cli feature exposes RonixArgs, a clap struct a binary flattens into its own argument parser."
+
+[[pages.sections]]
+type = "install"
+id = "quick-start"
+heading = "Add it to a project"
+intro = "Use the crate from Rust, or the flake from Nix. Both directions cover the same data, so a project can author its configuration on whichever side it already writes."
+guide_href = "https://github.com/caniko/ronix"
+
+[[pages.sections.primary_routes]]
+label = "Cargo dependency"
+audience = "Add under dependencies in Cargo.toml"
+href = "https://github.com/caniko/ronix#quick-start"
+command = "ronix = \"0.1\""
+recommended = true
+
+[[pages.sections.secondary_routes]]
+label = "Flake input"
+audience = "Nix flakes, then use ronix.lib in your outputs"
+href = "https://github.com/caniko/ronix#nix-library"
+command = "inputs.ronix.url = \"github:caniko/ronix\";"
+
+[[pages.sections.secondary_routes]]
+label = "Check the checkout"
+audience = "Nix with flakes, runs tests, clippy and fmt"
+href = "https://github.com/caniko/ronix#building-with-nix"
+command = "nix flake check"
