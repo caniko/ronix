@@ -2232,17 +2232,17 @@
         "rust-overlay": "rust-overlay_5"
       },
       "locked": {
-        "lastModified": 1794790451,
-        "narHash": "sha256-id21fnySLl9ZGTP2N7DE3lmDzPTEqabfRmRM5zq8Jls=",
+        "lastModified": 1794844991,
+        "narHash": "sha256-kR3pvSROfTxMyBYXL6Yo4O/xXjwqt3vDIDcITrCJav4=",
         "ref": "trunk",
-        "rev": "a2c6f8e0d0b3356a2528de381e6a095d150971fb",
-        "revCount": 348,
+        "rev": "adbbcf515fe831f9683a786410556d94372202eb",
+        "revCount": 350,
         "type": "git",
         "url": "https://github.com/caniko/harbor-rs.git"
       },
       "original": {
         "ref": "trunk",
-        "rev": "a2c6f8e0d0b3356a2528de381e6a095d150971fb",
+        "rev": "adbbcf515fe831f9683a786410556d94372202eb",
         "type": "git",
         "url": "https://github.com/caniko/harbor-rs.git"
       }
