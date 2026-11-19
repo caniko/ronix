@@ -2,7 +2,7 @@
   description = "ronix — RON ↔ Nix interop: serde serializer for Nix expressions + toRON/fromRON Nix library";
 
   inputs = {
-    rs-harbor.url = "git+https://github.com/caniko/harbor-rs.git?ref=trunk&rev=adbbcf515fe831f9683a786410556d94372202eb";
+    rs-harbor.url = "git+https://github.com/caniko/harbor-rs.git?ref=trunk&rev=3017b628b3a0603c2ebf7347a46951e8457ad414";
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
     crane.url = "github:ipetkov/crane";
     plinth = {
